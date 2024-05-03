@@ -1,9 +1,10 @@
-import cv2 
+import cv2
 import pandas as pd
 import openpyxl
 import numpy as np
 from File import File
 from collections import deque
+
 
 class Imagem:
     def __init__(self):
@@ -23,18 +24,26 @@ class Imagem:
     def selecionarCor(self):
         print("Digite uma com cor:")
         r = int(input("R:"))
-
         g = int(input("G:"))
         b = int(input("B:"))
-        return [r,g,b]
+        return [b, g, r]
+
+    def rgbParaCmyk(self, r, g, b):
+        c = 1 - (r / 255)
+        m = 1 - (g / 255)
+        y = 1 - (b / 255)
+        k = min(c, m, y)
+        c -= k
+        m -= k
+        y -= k
+        return [c, m, y, k]
 
     def pegarPixel(self, event, larg, alt, flags, params):
         if event == cv2.EVENT_LBUTTONDOWN:
-            print(self.imagem[alt, larg])
-            r,g,b = self.imagem[alt, larg]
-            self.corSelecionada = [r,g,b]
+            r, g, b = self.imagem[alt, larg]
+            self.corSelecionada = [r, g, b]
             cor = self.selecionarCor()
-            self.mudarCor(alt,larg, cor)
+            self.mudarCor(alt, larg, cor)
             self.mostrarImagem()
 
     def mudarCor(self, alt, larg, cor):
@@ -46,29 +55,39 @@ class Imagem:
 
         self.imagem[alt, larg] = cor
 
-        fila = deque([(alt + 1, larg), (alt - 1, larg), (alt, larg + 1), (alt, larg - 1)])
+        fila = deque(
+            [(alt + 1, larg), (alt - 1, larg), (alt, larg + 1), (alt, larg - 1)]
+        )
 
         while fila:
             a, l = fila.popleft()
-            if 0 <= a < self.altura and 0 <= l < self.largura and (self.imagem[a, l] == self.corSelecionada).all():
+            if (
+                0 <= a < self.altura
+                and 0 <= l < self.largura
+                and (self.imagem[a, l] == self.corSelecionada).all()
+            ):
                 self.imagem[a, l] = cor
                 fila.extend([(a + 1, l), (a - 1, l), (a, l + 1), (a, l - 1)])
 
-        
-
     def mostrarImagem(self):
-        cv2.namedWindow('janela')
-        cv2.setMouseCallback('janela', self.pegarPixel) 
-        cv2.imshow('janela',self.imagem)
+        cv2.namedWindow("janela")
+        cv2.setMouseCallback("janela", self.pegarPixel)
+        cv2.imshow("janela", self.imagem)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    def salvarEmExcel(self): 
-        imagem_hex = [['#{:02X}{:02X}{:02X}'.format(pixel[0], pixel[1], pixel[2]) for pixel in linha] for linha in self.imagem]
+    def salvarEmExcel(self):
+        imagem_hex = [
+            [
+                "#{:02X}{:02X}{:02X}".format(pixel[0], pixel[1], pixel[2])
+                for pixel in linha
+            ]
+            for linha in self.imagem
+        ]
         df = pd.DataFrame(imagem_hex)
         arquivo = File.salvarArquivo()
         df.to_excel(arquivo, index=False)
-    
+
     def hex_para_RGB(self, linha):
         linhaRGB = []
         for cores in linha:
@@ -79,7 +98,7 @@ class Imagem:
             B = int(sublistas[2], 16)
             linhaRGB.append([B, G, R])
         return linhaRGB
-        
+
     def carregarImagemExcel(self):
         caminho_imagem = File.abrirArquivo()
 
@@ -89,8 +108,6 @@ class Imagem:
         matriz_imagem = []
         for linha in sheet.iter_rows(values_only=True):
             linha = self.hex_para_RGB(linha)
-            if list(linha) == None:
-                print("entrei")
             matriz_imagem.append(list(linha))
 
         matriz_imagem = np.array(matriz_imagem, dtype=np.uint8)
