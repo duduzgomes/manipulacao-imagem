@@ -4,10 +4,12 @@ import openpyxl
 import numpy as np
 from File import File
 from collections import deque
+from PIL import Image 
 
 
 class Imagem:
     def __init__(self):
+        self.caminho_do_arquivo = None
         self.imagem = None
         self.linhas = None
         self.colunas = None
@@ -15,8 +17,8 @@ class Imagem:
         self.fila = []
 
     def carregarImagem(self):
-        caminho_do_arquivo = File.abrirArquivo()
-        self.imagem = cv2.imread(caminho_do_arquivo, 1)
+        self.caminho_do_arquivo = File.abrirArquivo()
+        self.imagem = cv2.imread(self.caminho_do_arquivo, 1)
         self.altura = self.imagem.shape[0]
         self.largura = self.imagem.shape[1]
         self.canal = self.imagem.shape[2]
@@ -32,11 +34,49 @@ class Imagem:
         c = 1 - (r / 255)
         m = 1 - (g / 255)
         y = 1 - (b / 255)
+
         k = min(c, m, y)
-        c -= k
-        m -= k
-        y -= k
-        return [c, m, y, k]
+
+        if(k < 1):
+            c = (c - k) / (1 - k )
+            m = (m - k) / (1 - k )
+            y = (y - k) / (1 - k )
+            k = k
+        return [c*255, m*255, y*255, k*255]
+    
+    def gerarImagemCmyk(self):
+        img = Image.open(self.caminho_do_arquivo)
+        img_array = np.array(self.imagem)
+        alt = img_array.shape[0]
+        larg = img_array.shape[1]
+
+        imagem_cmyk = np.zeros((img_array.shape[0], img_array.shape[1], 4), np.uint8)
+        
+        for a in range(alt):
+            for l in range(larg):
+                b,g,r = img_array[a, l] 
+                imagem_cmyk[a,l] = self.rgbParaCmyk(r,g,b)
+        
+        new = Image.fromarray(imagem_cmyk, mode='CMYK')
+        new.save('images/new.jpg')
+
+        teste = img.convert('CMYK')
+        r = np.array(teste)
+        w = Image.fromarray(r, mode='CMYK')
+
+        print(img.mode)
+        print(img_array.shape)
+
+        print(new.mode)
+        print(imagem_cmyk.shape)
+
+        print(img_array[1,1])
+        print(imagem_cmyk[1,1])
+        print(r[1,1])
+
+        w.show()
+        new.show()
+        # img.show()
 
     def pegarPixel(self, event, larg, alt, flags, params):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -49,9 +89,6 @@ class Imagem:
     def mudarCor(self, alt, larg, cor):
         if alt < 0 or alt >= self.altura or larg < 0 or larg >= self.largura:
             return
-
-        # if not (self.imagem[alt, larg] == self.corSelecionada).all():
-        #     return
 
         self.imagem[alt, larg] = cor
 
@@ -106,6 +143,7 @@ class Imagem:
         sheet = workbook.active
 
         matriz_imagem = []
+
         for linha in sheet.iter_rows(values_only=True):
             linha = self.hex_para_RGB(linha)
             matriz_imagem.append(list(linha))
@@ -115,6 +153,7 @@ class Imagem:
         caminho_salvo = File.salvarArquivo()
         cv2.imwrite(caminho_salvo, matriz_imagem)
         self.imagem = cv2.imread(caminho_salvo, 1)
+        self.caminho_do_arquivo = caminho_salvo
         self.altura = self.imagem.shape[0]
         self.largura = self.imagem.shape[1]
         self.canal = self.imagem.shape[2]
@@ -122,5 +161,6 @@ class Imagem:
 
 if __name__ == "__main__":
     img = Imagem()
-    img.carregarImagem()
-    img.mostrarImagem()
+    img.carregarImagemExcel()
+    img.gerarImagemCmyk()
+    # img.mostrarImagem()
