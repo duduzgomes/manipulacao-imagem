@@ -44,6 +44,41 @@ class Imagem:
             k = k
         return [c*255, m*255, y*255, k*255]
     
+    def calcPonderadaCinza(self, r, g, b):
+        media = r*0.2989 + g*0.5870 + b*0.1140 
+        return round(media)
+    
+    def calcCinzaMedia(self, r, g, b):
+        media = (r*0.33 + g*0.33 + b* 0.33)
+        return round(media)
+    
+    def calcMinCinza(self, r, g, b):
+        m = min(r, g, b)
+        return m
+    
+    def calcMaxCinza(self, r, g, b):
+        m = max(r, g, b)
+        return m
+    
+    def calTonCinza(self):
+        img = Image.open(self.caminho_do_arquivo)
+        img_array = np.array(self.imagem)
+        alt = img_array.shape[0]
+        larg = img_array.shape[1]
+
+        img_cinza = np.zeros((img_array.shape[0], img_array.shape[1]), np.uint8)
+        
+        for a in range(alt):
+            for l in range(larg):
+                b,g,r = img_array[a, l] 
+                img_cinza[a,l] = self.calcPonderadaCinza(r,g,b)
+
+        img_c = Image.fromarray(img_cinza, mode='L')
+        img_c.save('images/imagem-cinza.jpg')
+        img_c.show()
+
+        img.show()
+    
     def gerarImagemCmyk(self):
         img = Image.open(self.caminho_do_arquivo)
         img_array = np.array(self.imagem)
@@ -161,6 +196,6 @@ class Imagem:
 
 if __name__ == "__main__":
     img = Imagem()
-    img.carregarImagemExcel()
-    img.gerarImagemCmyk()
+    img.carregarImagem()
+    img.calTonCinza()
     # img.mostrarImagem()
