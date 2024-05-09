@@ -5,16 +5,18 @@ import numpy as np
 from File import File
 from collections import deque
 from PIL import Image 
+import matplotlib.pyplot as plt
 
 
 class Imagem:
     def __init__(self):
         self.caminho_do_arquivo = None
         self.imagem = None
-        self.linhas = None
-        self.colunas = None
+        self.altura = None
+        self.largura = None
         self.corSelecionada = None
         self.fila = []
+        self.histograma = None
 
     def carregarImagem(self):
         self.caminho_do_arquivo = File.abrirArquivo()
@@ -46,6 +48,9 @@ class Imagem:
     
     def calcPonderadaCinza(self, r, g, b):
         media = r*0.2989 + g*0.5870 + b*0.1140 
+        media -= 70
+        if( media < 0):
+            media = 0
         return round(media)
     
     def calcCinzaMedia(self, r, g, b):
@@ -60,7 +65,7 @@ class Imagem:
         m = max(r, g, b)
         return m
     
-    def calTonCinza(self):
+    def gerarImagemCinza(self):
         img = Image.open(self.caminho_do_arquivo)
         img_array = np.array(self.imagem)
         alt = img_array.shape[0]
@@ -192,10 +197,59 @@ class Imagem:
         self.altura = self.imagem.shape[0]
         self.largura = self.imagem.shape[1]
         self.canal = self.imagem.shape[2]
+    
+    def gerar_histrograma(self):
+        histograma = {}
 
+        for l in range(self.altura):
+            for c in range(self.largura):
+                intensidade = min(self.imagem[l, c])
+                if(intensidade in histograma):
+                    histograma[intensidade] += 1
+                else:
+                    histograma[intensidade] = 1
+
+        self.histograma = histograma
+        return histograma
+
+    def normalizar_histograma(self):
+        qtd_pixels = sum(self.histograma.values())
+
+        # chaves = list(self.histograma.keys())
+
+        histograma_normalizado = {}
+        intesidade_acumulada = 0
+        for intesidade, valor in self.histograma.items():
+            histograma_normalizado[intesidade] = valor/ qtd_pixels + intesidade_acumulada
+            intesidade_acumulada = histograma_normalizado[intesidade] 
+            histograma_normalizado[intesidade] *= 255
+            histograma_normalizado[intesidade] = round(histograma_normalizado[intesidade])
+        
+        print(histograma_normalizado)
+        self.histograma = histograma_normalizado
+        self.plotarHistograma()
+
+    def plotarHistograma(self):
+        h = self.histograma
+        # Calcular o total de intensidades
+        total_intensidades = sum(h.values())
+
+        # Calcular as porcentagens de cada intensidade
+        porcentagens = {intensidade: (contagem / total_intensidades) * 100 for intensidade, contagem in h.items()}
+
+        # Plotar o gráfico de barras das porcentagens
+        plt.bar(porcentagens.keys(), porcentagens.values(), edgecolor='black')
+        plt.xlabel('Intensidade')
+        plt.ylabel('Porcentagem de Ocorrência')
+        plt.title('Porcentagem de Ocorrência de Intensidades')
+        plt.grid(True)
+        plt.show()
+        
 
 if __name__ == "__main__":
     img = Imagem()
     img.carregarImagem()
-    img.calTonCinza()
+    img.gerar_histrograma()
+    img.plotarHistograma()
+    img.normalizar_histograma()
     # img.mostrarImagem()
