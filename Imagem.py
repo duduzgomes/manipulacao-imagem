@@ -209,22 +209,44 @@ class Imagem:
                 
         return histograma
     
-    def equalizar(self):
-        histograma_original = self.gerar_histrograma()
-        self.plotarHistograma(histograma_original)
+    def gerar_histrograma_RGB(self):
+        hist_b = {}
+        hist_g = {}
+        hist_r = {}
 
-        histograma_normalizado = self.normalizar_histograma(histograma_original)
+        for i in range(256):
+            hist_b[i] = 0
+            hist_g[i] = 0
+            hist_r[i] = 0
+
+        for l in range(self.altura):
+            for c in range(self.largura):
+                b,g,r = self.imagem[l, c]
+                hist_b[b] += 1 
+                hist_g[g] += 1 
+                hist_r[r] += 1 
+                
+        return [hist_b,hist_g,hist_r]
+    
+    def equalizar(self):
+        hist_b, hist_g,hist_r = self.gerar_histrograma_RGB()
+        self.plotarHistograma(hist_b,hist_g,hist_r)
+
+        hist_norm_B = self.normalizar_histograma(hist_b)
+        hist_norm_G = self.normalizar_histograma(hist_g)
+        hist_norm_R = self.normalizar_histograma(hist_r)
         
 
         for l in range(self.altura):
             for c in range(self.largura):
-                pixel = min(self.imagem[l,c])
-                if(pixel in histograma_normalizado.keys()):
-                    p = histograma_normalizado[pixel]
-                self.imagem[l,c] = (p,p,p)
+                b,g,r = self.imagem[l,c]
+                B = hist_norm_B[b]
+                G = hist_norm_G[g]
+                R = hist_norm_R[r]
+                self.imagem[l,c] = (R,G,B)
 
-        novo_histograma = self.gerar_histrograma()
-        self.plotarHistograma(novo_histograma)
+        a, b, c = self.gerar_histrograma_RGB()
+        self.plotarHistograma(c,b,a)
         
         img = Image.fromarray(self.imagem)
         img.show()
@@ -244,22 +266,91 @@ class Imagem:
             histograma_normalizado[intesidade] = round(histograma_normalizado[intesidade])
 
         return histograma_normalizado
+    def calc_contraste(self, B,G,R, cont):
+        b = B * cont
+        g = G * cont
+        r = R * cont
 
-    def plotarHistograma(self, histograma):
+        if(b > 255):
+            b = 255
+        if(g > 255):
+            g = 255
+        if(r > 255):
+            r = 255
 
-        x = np.array(list(histograma.values()))
+        return (R,G,B)
+    
+    def min_valor(self,d):
+        minimo = 0
+        for k , v in d.items():
+            if(v > 0):
+                minimo = int(k)
+                break
+        return minimo
+    def max_valor(self,d):
+        maximo = 0
+        for k , v in d.items():
+            if(v > 0):
+                maximo = int(k)
+                
+        return maximo
+
+    def contraste(self, taxa):
+        b, g ,r = self.gerar_histrograma_RGB()
+        self.plotarHistograma(b, g, r)
+
+        min_b = self.min_valor(b)
+        min_g = self.min_valor(g)
+        min_r = self.min_valor(r)
+
+        max_b = self.max_valor(b)
+        max_g = self.max_valor(g)
+        max_r = self.max_valor(r)
+      
+        fd_b = max_b - min_b
+        fd_g = max_g - min_g
+        fd_r = max_r - min_r
+
+        fator_escala_b = round((taxa * 255)) / fd_b
+        fator_escala_g = round((taxa * 255)) / fd_g
+        fator_escala_r = round((taxa * 255)) / fd_r
+        
+        
+        for i in range(self.altura):
+            for j in range(self.largura):
+                B, G, R = self.imagem[i,j]
+                b = round((B - min_b) * fator_escala_b)
+                g = round((G - min_g) * fator_escala_g)
+                r = round((R - min_r) * fator_escala_r)
+                self.imagem[i,j] = (min(r,255), min(g,255), min(b, 255))
+
+        b, g, r = self.gerar_histrograma_RGB()
+        self.plotarHistograma(b, g, r)
+
+        img = Image.fromarray(self.imagem)
+        img.show()
+
+    def plotarHistograma(self, h1,h2,h3):
+
+        x1 = np.array(list(h1.values()))
+        x2 = np.array(list(h2.values()))
+        x3 = np.array(list(h3.values()))
        
-        # Plotar o gráfico de barras das porcentagens
-        plt.plot(range(255), x)
-        plt.title('Histograma')
+
+        plt.plot(range(256), x1, color='blue')
+        plt.plot(range(256), x2, color='green')
+        plt.plot(range(256), x3, color='red')
+        plt.title('RGB')
         plt.xlabel('Valor')
         plt.ylabel('Frequência')
         plt.grid(True)
         plt.show()
 
+    
+
 if __name__ == "__main__":
     img = Imagem()
     img.carregarImagem()
-    img.equalizar()
+    img.contraste(1.75)
  
 
