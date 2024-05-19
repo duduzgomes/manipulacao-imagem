@@ -19,10 +19,9 @@ class Imagem:
 
     def carregarImagem(self):
         self.caminho_do_arquivo = File.abrirArquivo()
-        self.imagem = cv2.imread(self.caminho_do_arquivo, 1)
-        self.altura = self.imagem.shape[0]
-        self.largura = self.imagem.shape[1]
-        self.canal = self.imagem.shape[2]
+        self.img = Image.open(self.caminho_do_arquivo).convert("RGB")
+        self.imagem = np.array(self.img)
+        self.altura, self.largura, self.canal = self.imagem.shape
 
     def selecionarCor(self):
         print("Digite uma com cor:")
@@ -47,7 +46,8 @@ class Imagem:
     
     def calcPonderadaCinza(self, r, g, b):
         media = r*0.2989 + g*0.5870 + b*0.1140 
-        return round(media)
+        m = round(media)
+        return (m,m,m)
         
     def calcCinzaMedia(self, r, g, b):
         media = (r*0.33 + g*0.33 + b* 0.33)
@@ -55,30 +55,27 @@ class Imagem:
 
     def calcMinCinza(self, r, g, b):
         m = min(r, g, b)
-        return m
+        return (m,m,m)
 
     def calcMaxCinza(self, r, g, b):
         m = max(r, g, b)
-        return m
+        return (m,m,m)
     
     def gerarImagemCinza(self):
-        img = Image.open(self.caminho_do_arquivo)
-        img_array = np.array(self.imagem)
+        img_array = self.imagem
         alt = img_array.shape[0]
         larg = img_array.shape[1]
 
-        img_cinza = np.zeros((img_array.shape[0], img_array.shape[1]), np.uint8)
+        img_cinza = np.zeros((img_array.shape[0], img_array.shape[1], 3), np.uint8)
         
         for a in range(alt):
             for l in range(larg):
                 b,g,r = img_array[a, l] 
-                img_cinza[a,l] = self.calcPonderadaCinza(r,g,b)
+                img_cinza[a,l] = self.calcMaxCinza(r,g,b)
 
-        img_c = Image.fromarray(img_cinza, mode='L')
-        img_c.save('images/imagem-cinza.jpg')
-        img_c.show()
 
-        img.show()
+        self.imagem = img_cinza
+        
     
     def gerarImagemCmyk(self):
         img_array = np.array(self.imagem)
@@ -201,7 +198,7 @@ class Imagem:
 
         for l in range(self.altura):
             for c in range(self.largura):
-                b,g,r = self.imagem[l, c]
+                r,g,b = self.imagem[l, c]
                 hist_b[b] += 1 
                 hist_g[g] += 1 
                 hist_r[r] += 1 
@@ -210,7 +207,7 @@ class Imagem:
     
     def equalizar(self):
         hist_b, hist_g,hist_r = self.gerar_histrograma_RGB()
-        self.plotarHistograma(hist_b,hist_g,hist_r)
+
 
         hist_norm_B = self.normalizar_histograma(hist_b)
         hist_norm_G = self.normalizar_histograma(hist_g)
@@ -219,16 +216,11 @@ class Imagem:
 
         for l in range(self.altura):
             for c in range(self.largura):
-                b,g,r = self.imagem[l,c]
+                r,g,b = self.imagem[l,c]
                 B = hist_norm_B[b]
                 G = hist_norm_G[g]
                 R = hist_norm_R[r]
-                self.imagem[l,c] = (B,G,R)
-
-        a, b, c = self.gerar_histrograma_RGB()
-        self.plotarHistograma(a,b,c)
-        
-        self.mostrarImagem()
+                self.imagem[l,c] = (R,G,B)
 
     def normalizar_histograma(self, hist):
         qtd_pixels = sum(hist.values())
@@ -283,13 +275,12 @@ class Imagem:
         
         for i in range(self.altura):
             for j in range(self.largura):
-                B, G, R = self.imagem[i,j]
+                R, G, B = self.imagem[i,j]
                 b = round((B - min_b) * fator_escala_b)
                 g = round((G - min_g) * fator_escala_g)
                 r = round((R - min_r) * fator_escala_r)
-                self.imagem[i,j] = (min(b,255), min(g,255), min(r, 255))
+                self.imagem[i,j] = (min(r,255), min(g,255), min(b, 255))
 
-        self.mostrarImagem()
 
     def plotarHistograma(self, h1,h2,h3):
 
@@ -310,7 +301,7 @@ class Imagem:
     def mostrar_canal(self, canal):    
         for i in range(self.altura):
             for j in range(self.largura):
-                B, G, R = self.imagem[i,j]
+                R, G, B = self.imagem[i,j]
                 if(canal == 'b'):
                     self.imagem[i,j] = (B,0,0)
                 elif(canal == 'g'):
@@ -329,8 +320,11 @@ class Imagem:
         self.mostrarImagem()
 
     def deteccao_borda(self):
-        # m = [0.0625,0,125,0.0625,0.125,0.25,0.125,0.0625,0125,0.0625]
-        m = [0,-1,0,-1,4,-1,0,-1,0]
+        # m = [-1,0,1,-2,0,2,-1,0,1] # Sobel
+        # m = [0,-1,0,-1,4,-1,0,-1,0] # Laplaciano
+        m = [-1,-1,-1,-1,8,-1,-1,-1,-1] # Laplaciano melhorado
+        # m = [5,5,5,-3,0,-3,-3,-3,-3] #  Kirsch 
+
         img_saida = np.zeros((self.altura, self.largura,3),np.uint8)
 
         for a in range(self.altura):
@@ -359,8 +353,8 @@ class Imagem:
 
                 img_saida[a,l] = (r,r,r) 
         
-        img = Image.fromarray(img_saida)
-        img.show()
+        self.imagem = img_saida
+
 
     def filtro_blur(self):
 
@@ -393,15 +387,13 @@ class Imagem:
 
                 img_saida[a,l] = (r,r,r) 
         
-        img = Image.fromarray(img_saida)
-        img.show()
+        self.imagem = img_saida
 
 
-    
 
 if __name__ == "__main__":
     img = Imagem()
     img.carregarImagem()
-    img.filtro_blur()
+    img.deteccao_borda()
     
 
