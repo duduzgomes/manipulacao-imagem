@@ -2,12 +2,13 @@ import tkinter as tk
 from tkinter import ttk, Frame, Button, Menu
 from PIL import Image, ImageTk
 from Imagem import Imagem
+from janela_contraste import Contraste
 
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title('Tkinter PhotoImage Demo')
+        self.title('Photoshop da Shoppe')
         self.configure(background='#202124')
         self.img = Imagem()
         self.carregar_e_mostrar_imagem()
@@ -42,6 +43,7 @@ class App(tk.Tk):
         menu_imagem = Menu(menu_principal, tearoff=0)
         menu_imagem.add_command(label='Converter para CMYK', command=self.imagem_cmyk)
         menu_imagem.add_command(label='Converter para Cinza', command=self.imagem_cinza)
+        menu_imagem.add_command(label='Plotar Histograma', command=self.histograma)
         
         menu_cores = Menu(menu_principal, tearoff=0)
         menu_cores.add_command(label='Contraste', command=self.contraste)
@@ -89,7 +91,9 @@ class App(tk.Tk):
         self.label_imagem.image = self.python_image
 
     def contraste(self):
-        self.img.contraste(1)
+        root = Contraste(self)
+        self.wait_window(root)
+        self.img.contraste(root.valor)
         self.image = Image.fromarray(self.img.imagem)
         self.python_image = ImageTk.PhotoImage(self.image)
         self.label_imagem.configure(image=self.python_image)
@@ -108,6 +112,9 @@ class App(tk.Tk):
         self.python_image = ImageTk.PhotoImage(self.image)
         self.label_imagem.configure(image=self.python_image)
         self.label_imagem.image = self.python_image
+    
+    def histograma(self):
+        self.img.plotarHistograma()
 
 
 

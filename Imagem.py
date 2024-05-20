@@ -86,11 +86,11 @@ class Imagem:
         
         for a in range(alt):
             for l in range(larg):
-                b,g,r = img_array[a, l] 
+                r,g,b = img_array[a, l] 
                 imagem_cmyk[a,l] = self.rgbParaCmyk(r,g,b)
         
-        new = Image.fromarray(imagem_cmyk, mode='CMYK')
-        new.save('images/new.jpg')
+        # new = Image.fromarray(imagem_cmyk, mode='CMYK')
+        self.imagem = imagem_cmyk
 
     def pegarPixel(self, event, larg, alt, flags, params):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -222,6 +222,22 @@ class Imagem:
                 R = hist_norm_R[r]
                 self.imagem[l,c] = (R,G,B)
 
+
+    def operacao_linear(self, hist, alpha):
+        hist_final = {}
+
+        for i in range(255):
+            hist_final[i] = 0
+        
+        for i, valor in hist.items():
+            calc = round(alpha * (int(i) - 128) + 128)
+            hist_final[i] = min(max(calc, 0),255)
+        
+        return hist_final
+
+        
+
+
     def normalizar_histograma(self, hist):
         qtd_pixels = sum(hist.values())
 
@@ -256,39 +272,23 @@ class Imagem:
     def contraste(self, taxa):
         b, g ,r = self.gerar_histrograma_RGB()
 
-        min_b = self.min_valor(b)
-        min_g = self.min_valor(g)
-        min_r = self.min_valor(r)
+        blue = self.operacao_linear(b, taxa)
+        green = self.operacao_linear(g, taxa)
+        red = self.operacao_linear(r, taxa)
 
-        max_b = self.max_valor(b)
-        max_g = self.max_valor(g)
-        max_r = self.max_valor(r)
-        
-        fd_b = max_b - min_b
-        fd_g = max_g - min_g
-        fd_r = max_r - min_r
-
-        fator_escala_b = round(taxa * 255 / fd_b)
-        fator_escala_g = round(taxa * 255 / fd_g)
-        fator_escala_r = round(taxa * 255 / fd_r)
-        
-        
         for i in range(self.altura):
             for j in range(self.largura):
                 R, G, B = self.imagem[i,j]
-                b = round((B - min_b) * fator_escala_b)
-                g = round((G - min_g) * fator_escala_g)
-                r = round((R - min_r) * fator_escala_r)
-                self.imagem[i,j] = (min(r,255), min(g,255), min(b, 255))
+                self.imagem[i,j] = (red[R], green[G], blue[B])
 
 
-    def plotarHistograma(self, h1,h2,h3):
+    def plotarHistograma(self):
+        b, g, r = self.gerar_histrograma_RGB()
 
-        x1 = np.array(list(h1.values()))
-        x2 = np.array(list(h2.values()))
-        x3 = np.array(list(h3.values()))
+        x1 = np.array(list(b.values()))
+        x2 = np.array(list(g.values()))
+        x3 = np.array(list(r.values()))
         
-
         plt.plot(range(256), x1, color='blue')
         plt.plot(range(256), x2, color='green')
         plt.plot(range(256), x3, color='red')
@@ -342,7 +342,7 @@ class Imagem:
                 pb = min(self.imagem[a-1,l])
             
                 media = (pec * m[0] + pc * m[1] + pdc * m[2] + pe * m[3] + p * m[4]
-                      + pd * m[5] + peb * m[6] + pb * m[7] + pdb * m[8]) 
+                        + pd * m[5] + peb * m[6] + pb * m[7] + pdb * m[8]) 
                 
                 r = round(media)
 
@@ -386,14 +386,5 @@ class Imagem:
                     r=0
 
                 img_saida[a,l] = (r,r,r) 
-        
-        self.imagem = img_saida
-
-
-
-if __name__ == "__main__":
-    img = Imagem()
-    img.carregarImagem()
-    img.deteccao_borda()
     
-
+        self.imagem = img_saida
