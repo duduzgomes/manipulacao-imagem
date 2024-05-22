@@ -12,6 +12,7 @@ class Imagem:
     def __init__(self):
         self.caminho_do_arquivo = None
         self.imagem = None
+        self.imagem_saida = None
         self.altura = None
         self.largura = None
         self.corSelecionada = None
@@ -22,6 +23,7 @@ class Imagem:
         self.img = Image.open(self.caminho_do_arquivo).convert("RGB")
         self.imagem = np.array(self.img)
         self.altura, self.largura, self.canal = self.imagem.shape
+        self.imagem_saida = np.zeros((self.imagem.shape[0], self.imagem.shape[1], 3), np.uint8)
 
     def selecionarCor(self):
         print("Digite uma com cor:")
@@ -61,7 +63,7 @@ class Imagem:
         m = max(r, g, b)
         return (m,m,m)
     
-    def gerarImagemCinza(self):
+    def gerarImagemCinza(self, tipo):
         img_array = self.imagem
         alt = img_array.shape[0]
         larg = img_array.shape[1]
@@ -71,10 +73,17 @@ class Imagem:
         for a in range(alt):
             for l in range(larg):
                 b,g,r = img_array[a, l] 
-                img_cinza[a,l] = self.calcMaxCinza(r,g,b)
+                if(tipo == 'min'):
+                    img_cinza[a,l] = self.calcMinCinza(r,g,b)
+                elif(tipo == 'max'):
+                    img_cinza[a,l] = self.calcMaxCinza(r,g,b)
+                elif(tipo == 'media'):
+                    img_cinza[a,l] = self.calcCinzaMedia(r,g,b)
+                elif(tipo == 'ponderada'):
+                    img_cinza[a,l] = self.calcPonderadaCinza(r,g,b)
 
 
-        self.imagem = img_cinza
+        self.imagem_saida = img_cinza
         
     
     def gerarImagemCmyk(self):
@@ -89,8 +98,9 @@ class Imagem:
                 r,g,b = img_array[a, l] 
                 imagem_cmyk[a,l] = self.rgbParaCmyk(r,g,b)
         
-        # new = Image.fromarray(imagem_cmyk, mode='CMYK')
-        self.imagem = imagem_cmyk
+        new = Image.fromarray(imagem_cmyk, mode='CMYK')
+        caminho = File.salvarArquivo()
+        new.save(caminho)
 
     def pegarPixel(self, event, larg, alt, flags, params):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -126,6 +136,12 @@ class Imagem:
         cv2.imshow("janela", self.imagem)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+    
+    def salvar_imagem(self):
+        img = np.array(self.imagem)
+        new_img = Image.fromarray(img, mode="RGB")
+        caminho = File.salvarArquivo()
+        new_img.save(caminho)
 
     def salvarEmExcel(self):
         imagem_hex = [
@@ -172,20 +188,6 @@ class Imagem:
         self.largura = self.imagem.shape[1]
         self.canal = self.imagem.shape[2]
     
-    def gerar_histrograma(self):
-        histograma = {}
-
-        for i in range(255):
-            histograma[i] = 0
-
-        for l in range(self.altura):
-            for c in range(self.largura):
-                intensidade = min(self.imagem[l, c])
-                if(intensidade in histograma):
-                    histograma[intensidade] += 1
-                
-        return histograma
-    
     def gerar_histrograma_RGB(self):
         hist_b = {}
         hist_g = {}
@@ -199,6 +201,25 @@ class Imagem:
         for l in range(self.altura):
             for c in range(self.largura):
                 r,g,b = self.imagem[l, c]
+                hist_b[b] += 1 
+                hist_g[g] += 1 
+                hist_r[r] += 1 
+                
+        return [hist_b,hist_g,hist_r]
+    
+    def gerar_histrograma_RGB_saida(self):
+        hist_b = {}
+        hist_g = {}
+        hist_r = {}
+
+        for i in range(256):
+            hist_b[i] = 0
+            hist_g[i] = 0
+            hist_r[i] = 0
+
+        for l in range(self.altura):
+            for c in range(self.largura):
+                r,g,b = self.imagem_saida[l, c]
                 hist_b[b] += 1 
                 hist_g[g] += 1 
                 hist_r[r] += 1 
@@ -220,7 +241,7 @@ class Imagem:
                 B = hist_norm_B[b]
                 G = hist_norm_G[g]
                 R = hist_norm_R[r]
-                self.imagem[l,c] = (R,G,B)
+                self.imagem_saida[l,c] = (R,G,B)
 
 
     def operacao_linear(self, hist, alpha):
@@ -234,10 +255,7 @@ class Imagem:
             hist_final[i] = min(max(calc, 0),255)
         
         return hist_final
-
-        
-
-
+    
     def normalizar_histograma(self, hist):
         qtd_pixels = sum(hist.values())
 
@@ -254,36 +272,45 @@ class Imagem:
 
         return histograma_normalizado
     
-    def min_valor(self,d):
-        minimo = 0
-        for k , v in d.items():
-            if(v > 0):
-                minimo = int(k)
-                break
-        return minimo
-    def max_valor(self,d):
-        maximo = 0
-        for k , v in d.items():
-            if(v > 0):
-                maximo = int(k)
-                
-        return maximo
-
-    def contraste(self, taxa):
+    def contraste_brilho(self, taxa_contraste, taxa_brilho):
         b, g ,r = self.gerar_histrograma_RGB()
 
-        blue = self.operacao_linear(b, taxa)
-        green = self.operacao_linear(g, taxa)
-        red = self.operacao_linear(r, taxa)
+        blue = self.operacao_linear(b, taxa_contraste)
+        green = self.operacao_linear(g, taxa_contraste)
+        red = self.operacao_linear(r, taxa_contraste)
 
         for i in range(self.altura):
             for j in range(self.largura):
                 R, G, B = self.imagem[i,j]
-                self.imagem[i,j] = (red[R], green[G], blue[B])
+                a = red[R] + (red[R] * taxa_brilho) 
+                b = green[G] + (green[G] * taxa_brilho) 
+                c = blue[B] + (blue[B] * taxa_brilho) 
+
+                A = min(max(a, 0), 255)
+                B = min(max(b, 0), 255)
+                C = min(max(c, 0), 255)
+
+                self.imagem_saida[i,j] = (A, B, C)
 
 
-    def plotarHistograma(self):
+    def plotarHistograma_img_entrada(self):
         b, g, r = self.gerar_histrograma_RGB()
+
+        x1 = np.array(list(b.values()))
+        x2 = np.array(list(g.values()))
+        x3 = np.array(list(r.values()))
+        
+        plt.plot(range(256), x1, color='blue')
+        plt.plot(range(256), x2, color='green')
+        plt.plot(range(256), x3, color='red')
+        plt.title('RGB')
+        plt.xlabel('Valor')
+        plt.ylabel('Frequência')
+        plt.grid(True)
+        plt.show()
+
+    def plotarHistograma_img_saida(self):
+        b, g, r = self.gerar_histrograma_RGB_saida()
 
         x1 = np.array(list(b.values()))
         x2 = np.array(list(g.values()))
@@ -299,30 +326,32 @@ class Imagem:
         plt.show()
     
     def mostrar_canal(self, canal):    
+        img_saida = np.zeros((self.altura, self.largura,3),np.uint8)
         for i in range(self.altura):
             for j in range(self.largura):
                 R, G, B = self.imagem[i,j]
                 if(canal == 'b'):
-                    self.imagem[i,j] = (B,0,0)
+                    img_saida[i,j] = (0,0,B)
                 elif(canal == 'g'):
-                    self.imagem[i,j] = (0,G,0)
+                    img_saida[i,j] = (0,G,0)
                 elif(canal == 'r'):
-                    self.imagem[i,j] = (0,0,R)
+                    img_saida[i,j] = (R,0,0)
                 elif(canal == 'bg' or canal == 'gb'):
-                    self.imagem[i,j] = (B,G,0)
+                    img_saida[i,j] = (0,G,B)
                 elif(canal == 'br' or canal == 'rb'):
-                    self.imagem[i,j] = (B,0,R)
+                    img_saida[i,j] = (R,0,B)
                 elif(canal == 'gr' or canal == 'rg'):
-                    self.imagem[i,j] = (0,G,R)
+                    img_saida[i,j] = (R,G,0)
                 elif(canal == 'r'):
-                    self.imagem[i,j] = (0,0,R)
+                    img_saida[i,j] = (R,0,0)
+                else:
+                    img_saida[i,j] = (R,G,B)
+        self.imagem_saida = img_saida
 
-        self.mostrarImagem()
-
-    def deteccao_borda(self):
+    def deteccao_borda(self, m):
         # m = [-1,0,1,-2,0,2,-1,0,1] # Sobel
         # m = [0,-1,0,-1,4,-1,0,-1,0] # Laplaciano
-        m = [-1,-1,-1,-1,8,-1,-1,-1,-1] # Laplaciano melhorado
+        # m = [-1,-1,-1,-1,8,-1,-1,-1,-1] # Laplaciano melhorado
         # m = [5,5,5,-3,0,-3,-3,-3,-3] #  Kirsch 
 
         img_saida = np.zeros((self.altura, self.largura,3),np.uint8)
@@ -353,7 +382,7 @@ class Imagem:
 
                 img_saida[a,l] = (r,r,r) 
         
-        self.imagem = img_saida
+        self.imagem_saida = img_saida
 
 
     def filtro_blur(self):
@@ -387,4 +416,5 @@ class Imagem:
 
                 img_saida[a,l] = (r,r,r) 
     
-        self.imagem = img_saida
+        self.imagem_saida = img_saida
+
